@@ -1,0 +1,90 @@
+log:
+    file: ""
+    level: info
+data_providers:
+  - tag: geoip
+    file: ./geoip.dat
+    auto_reload: true
+  - tag: geosite
+    file: ./geosite.dat
+    auto_reload: true
+plugins:
+    - tag: cache
+      type: cache
+      args:
+        size: 4096
+        lazy_cache_ttl: 172800
+
+    - tag: forward_cn
+      type: fast_forward
+      args:
+        upstream:
+          - addr: https://223.5.5.5/dns-query
+            trusted: true
+          - addr: https://120.53.53.53/dns-query
+            trusted: true
+
+    - tag: forward_non_cn
+      type: fast_forward
+      args:
+        upstream:
+          - addr: https://8.8.8.8/dns-query
+            trusted: true
+
+    - tag: query_is_cn_domain
+      type: query_matcher
+      args:
+        domain:
+          - 'provider:geosite:apple-cn'
+          - 'provider:geosite:cn'
+
+    - tag: query_is_non_cn_domain
+      type: query_matcher
+      args:
+        domain:
+          - 'provider:geosite:geolocation-!cn'
+
+    - tag: response_has_cn_ip
+      type: response_matcher
+      args:
+        ip:
+          - 'provider:geoip:cn'
+
+    - tag: main_sequence
+      type: sequence
+      args:
+        exec:
+          - cache
+
+          - if: query_is_cn_domain
+            exec:
+              - forward_cn
+              - _return
+
+          - if: query_is_non_cn_domain
+            exec:
+              - forward_non_cn
+              - _return
+
+          - primary:
+              - forward_cn
+              - if: "(! response_has_cn_ip) && [_response_valid_answer]"
+                exec:
+                  - _drop_response
+
+            secondary:
+              - _prefer_ipv4
+              - forward_non_cn
+
+            fast_fallback: 200
+
+servers:
+    - exec: main_sequence
+      timeout: 5
+      listeners:
+        - addr: ":53"
+          protocol: udp
+          idle_timeout: 10
+        - addr: ":53"
+          protocol: tcp
+          idle_timeout: 10
