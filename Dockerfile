@@ -19,8 +19,8 @@ RUN apk add --no-cache ca-certificates \
 	&& mkdir /etc/mosdns
 ADD entrypoint.sh /entrypoint.sh
 ADD config.yaml /config.yaml
-ADD /geodata/geoip.dat
-ADD /geodata/geosite.dat
+ADD /geodata/geoip.dat /geoip.dat
+ADD /geodata/geosite.dat /geosite.dat
 VOLUME /etc/mosdns
 EXPOSE 53/udp 53/tcp
 RUN chmod +x /entrypoint.sh
